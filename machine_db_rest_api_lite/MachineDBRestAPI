@@ -1,0 +1,73 @@
+#!/usr/bin/env perl
+use Mojolicious::Lite;
+
+use MongoDB;
+use JSON;
+use Data::Serializer;
+use Data::Dumper;
+
+# Documentation browser under "/perldoc"
+plugin 'PODRenderer';
+
+## Get a DB once:
+my $db_name   = 'machinedb';
+my $coll_name = 'machines';
+
+my $client = MongoDB::MongoClient->new;
+my $db = $client->get_database( $db_name );
+my $machines = $db->get_collection( $coll_name );
+
+my $ser = Data::Serializer->new();
+
+my $JSON = JSON->new->allow_blessed;
+
+get '/' => sub {
+  my $self = shift;
+  $self->render('index');
+};
+
+get '/V1/host/:host' => sub {
+    my $self = shift;
+
+    my $host = $self->param('host');
+    my $cursor = $machines->find( { 'hostname' => { '$regex' => qr/$host\.*/msi } } );
+
+    #my $text = $JSON->pretty->encode( $resp );
+    my $text = '';
+    while ( my $item = $cursor->next() ){
+        $text .=  $JSON->pretty->encode( $item ) . "\n";
+        #$text .= "Host: $item->{'hostname'}    Vendor: $item->{'hardwareVendor'} <br>";
+    }
+    
+    $self->render( text => $text );
+};
+
+get '/V1/vendor/:vendor' => sub {
+    my $self = shift;
+
+    my $vendor = $self->param('vendor');
+    my $cursor = $machines->find( { 'hardwareVendor' => { '$regex' => qr/$vendor\.*/msi } } );
+
+    my $text = '';
+    while ( my $item = $cursor->next() ){
+        $text .=  $JSON->pretty->encode( $item ) . "\n";
+        #$text .= "Host: $item->{'hostname'}    Vendor: $item->{'hardwareVendor'} <br>";
+    }
+    
+    $self->render( text => $text );
+};
+
+app->start;
+__DATA__
+
+@@ index.html.ep
+% layout 'default';
+% title 'Welcome';
+Welcome to the Mojolicious real-time web framework!
+
+@@ layouts/default.html.ep
+<!DOCTYPE html>
+<html>
+  <head><title><%= title %></title></head>
+  <body><%= content %></body>
+</html>
